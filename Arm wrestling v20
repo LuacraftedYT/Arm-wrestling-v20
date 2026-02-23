@@ -2,35 +2,51 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
    Name = "LUACRAFTED HUB | Arm Wrestle Simulator",
-   LoadingTitle = "LUACRAFTED V25",
-   LoadingSubtitle = "Injecting Modules...",
+   LoadingTitle = "LUACRAFTED V31",
+   LoadingSubtitle = "Optimized & Lag-Free...",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
 
 local FarmTab = Window:CreateTab("Chaos Island", 4483362458) 
 
+--- Services ---
 local Player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
 local KnitServices = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services")
 local ChaosService = KnitServices:WaitForChild("ChaosBreakablesService"):WaitForChild("RF")
+local ToolService = KnitServices:WaitForChild("ToolService"):WaitForChild("RE")
 local AxeFolder = workspace:WaitForChild("GameObjects"):WaitForChild("ChaosBreakables"):WaitForChild("Axe")
 
+--- Variables & Math Database ---
 local selectedTree = "All Options"
-local selectedAxeCD = 0.75 
 local autoFarmActive = false
+local autoTrainActive = false
 
+local axesData = {
+    ["Wooden (0.75s)"]  = {cd = 0.75, dmg = 2},
+    ["Stone (0.70s)"]   = {cd = 0.70, dmg = 4},
+    ["Iron (0.60s)"]    = {cd = 0.60, dmg = 6},
+    ["Gold (0.50s)"]    = {cd = 0.50, dmg = 10},
+    ["Diamond (0.35s)"] = {cd = 0.35, dmg = 18}
+}
+
+local currentAxe = axesData["Wooden (0.75s)"] 
+
+--- Teleport Logic ---
 local function glideTo(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
-        local targetCFrame = CFrame.new(targetPos.X, root.Position.Y, targetPos.Z) * CFrame.new(0, 0, 3)
+        root.Anchored = false 
+        local targetCFrame = CFrame.new(targetPos.X, root.Position.Y, targetPos.Z) * CFrame.new(0, 0, 3.2)
         local tween = TweenService:Create(root, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {CFrame = targetCFrame})
         tween:Play()
         tween.Completed:Wait()
     end
 end
 
+--- Toggles & Dropdowns ---
 FarmTab:CreateDropdown({
    Name = "Select Tree Target",
    Options = {"All Options", "PalmTree", "ChaosTree"},
@@ -49,12 +65,24 @@ FarmTab:CreateDropdown({
    MultipleOptions = false,
    Flag = "AxeSelect",
    Callback = function(Option)
-       local choice = Option[1]
-       if choice:match("Wooden") then selectedAxeCD = 0.75
-       elseif choice:match("Stone") then selectedAxeCD = 0.70
-       elseif choice:match("Iron") then selectedAxeCD = 0.60
-       elseif choice:match("Gold") then selectedAxeCD = 0.50
-       elseif choice:match("Diamond") then selectedAxeCD = 0.35
+       currentAxe = axesData[Option[1]]
+   end,
+})
+
+FarmTab:CreateToggle({
+   Name = "Auto Train (Swing in Air)",
+   CurrentValue = false,
+   Flag = "AutoTrain",
+   Callback = function(Value)
+       autoTrainActive = Value
+       if autoTrainActive then
+           task.spawn(function()
+               local trainRemote = ToolService:WaitForChild("onClick")
+               while autoTrainActive do
+                   task.spawn(function() trainRemote:FireServer() end)
+                   task.wait(currentAxe.cd) 
+               end
+           end)
        end
    end,
 })
@@ -66,6 +94,13 @@ FarmTab:CreateToggle({
    Callback = function(Value)
        autoFarmActive = Value
        
+       local char = Player.Character
+       local root = char and char:FindFirstChild("HumanoidRootPart")
+       
+       if not autoFarmActive and root then
+           root.Anchored = false
+       end
+       
        if autoFarmActive then
            task.spawn(function()
                local clickRemote = ChaosService:WaitForChild("Clicked")
@@ -76,22 +111,36 @@ FarmTab:CreateToggle({
                        
                        local treeName = tree.Name
                        local isMatch = false
+                       local targetHP = 50 
                        
-                       if selectedTree == "All Options" then
-                           isMatch = true
-                       elseif selectedTree == "PalmTree" and string.find(string.lower(treeName), "palm") then
-                           isMatch = true
-                       elseif selectedTree == "ChaosTree" and string.find(string.lower(treeName), "chaos") then
-                           isMatch = true
+                       if string.find(string.lower(treeName), "chaos") then
+                           targetHP = 250
+                           if selectedTree == "All Options" or selectedTree == "ChaosTree" then isMatch = true end
+                       elseif string.find(string.lower(treeName), "palm") then
+                           targetHP = 50
+                           if selectedTree == "All Options" or selectedTree == "PalmTree" then isMatch = true end
+                       else
+                           if selectedTree == "All Options" then isMatch = true end
                        end
                        
-                       if isMatch and tree:FindFirstChildWhichIsA("BasePart") then
-                           local hitPart = tree:FindFirstChildWhichIsA("BasePart")
-                           glideTo(hitPart.Position)
+                       if isMatch then
+                           local hitPart = tree:IsA("BasePart") and tree or tree:FindFirstChildWhichIsA("BasePart")
                            
-                           while tree and tree.Parent and tree:FindFirstChildWhichIsA("BasePart") and autoFarmActive do
-                               task.spawn(function() clickRemote:InvokeServer() end)
-                               task.wait(selectedAxeCD) 
+                           if hitPart and hitPart.Transparency < 1 then
+                               glideTo(hitPart.Position)
+                               
+                               root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                               if root then root.Anchored = true end
+                               
+                               local hitsRequired = math.ceil(targetHP / currentAxe.dmg) + 5
+                               
+                               for hit = 1, hitsRequired do
+                                   if not autoFarmActive then break end
+                                   task.spawn(function() clickRemote:InvokeServer() end)
+                                   task.wait(currentAxe.cd) 
+                               end
+                               
+                               if root then root.Anchored = false end
                            end
                        end
                    end
@@ -101,3 +150,4 @@ FarmTab:CreateToggle({
        end
    end,
 })
+
