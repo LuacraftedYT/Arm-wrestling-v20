@@ -1,185 +1,25 @@
-local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local MinimizeBtn = Instance.new("TextButton")
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local TargetCycleButton = Instance.new("TextButton")
-local AxeCycleButton = Instance.new("TextButton")
-local AutoClickButton = Instance.new("TextButton") 
-local AutoTrainButton = Instance.new("TextButton")
-local AutoFarmButton = Instance.new("TextButton")
+local Window = Rayfield:CreateWindow({
+   Name = "LUACRAFTED HUB | Arm Wrestle Simulator",
+   LoadingTitle = "LUACRAFTED V25",
+   LoadingSubtitle = "Injecting Modules...",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false 
+})
 
-local UIListLayout = Instance.new("UIListLayout")
+local FarmTab = Window:CreateTab("Chaos Island", 4483362458) 
+
+local Player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-
--- GUI Setup
-ScreenGui.Name = "LuacraftedHub"
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.ResetOnSpawn = false
-
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MainFrame.Position = UDim2.new(0.5, -100, 0.05, 0)
-MainFrame.Size = UDim2.new(0, 200, 0, 280) 
-MainFrame.Active = true
-MainFrame.ClipsDescendants = true 
-
--- Custom Mobile Dragging
-local dragging, dragInput, dragStart, startPos
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
--- Title & Minimize
-Title.Parent = MainFrame
-Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "LUACRAFTED"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-Title.Font = Enum.Font.GothamBold
-
-MinimizeBtn.Parent = MainFrame
-MinimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-MinimizeBtn.Position = UDim2.new(1, -35, 0, 2)
-MinimizeBtn.Text = "-"
-MinimizeBtn.TextSize = 20
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
-
-local minimized = false
-MinimizeBtn.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        MainFrame.Size = UDim2.new(0, 200, 0, 35)
-        MinimizeBtn.Text = "+"
-    else
-        MainFrame.Size = UDim2.new(0, 200, 0, 280)
-        MinimizeBtn.Text = "-"
-    end
-end)
-
-local function style(btn, text)
-    btn.Size = UDim2.new(0, 180, 0, 40)
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamSemibold
-    btn.Parent = MainFrame
-    Instance.new("UICorner", btn)
-end
-
--- Create Buttons
-style(TargetCycleButton, "Target: Normal (50 HP)")
-style(AxeCycleButton, "Axe: Wooden (0.75s)")
-style(AutoClickButton, "Auto Click: OFF")
-style(AutoTrainButton, "Auto Train: OFF")
-style(AutoFarmButton, "Auto Farm: OFF")
-
-UIListLayout.Parent = MainFrame
-UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIListLayout.Padding = UDim.new(0, 5)
-
---- Smart Math Database ---
-local axes = {
-    {name = "Wooden", cd = 0.75, dmg = 2},
-    {name = "Stone", cd = 0.70, dmg = 4},
-    {name = "Iron", cd = 0.60, dmg = 6},
-    {name = "Gold", cd = 0.50, dmg = 10},
-    {name = "Diamond", cd = 0.35, dmg = 18}
-}
-
-local currentAxeIndex = 1
-local currentTargetHP = 50 
-
-local function getHitsNeeded()
-    return math.ceil(currentTargetHP / axes[currentAxeIndex].dmg)
-end
-
---- Services ---
 local KnitServices = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services")
 local ChaosService = KnitServices:WaitForChild("ChaosBreakablesService"):WaitForChild("RF")
-local ToolService = KnitServices:WaitForChild("ToolService"):WaitForChild("RE")
 local AxeFolder = workspace:WaitForChild("GameObjects"):WaitForChild("ChaosBreakables"):WaitForChild("Axe")
-local Player = game.Players.LocalPlayer
 
-local clicking = false
-local farming = false
-local training = false
+local selectedTree = "All Options"
+local selectedAxeCD = 0.75 
+local autoFarmActive = false
 
--- Config Toggles
-TargetCycleButton.MouseButton1Click:Connect(function()
-    if currentTargetHP == 50 then
-        currentTargetHP = 250
-        TargetCycleButton.Text = "Target: Chaos (250 HP)"
-        TargetCycleButton.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-    else
-        currentTargetHP = 50
-        TargetCycleButton.Text = "Target: Normal (50 HP)"
-        TargetCycleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    end
-end)
-
-AxeCycleButton.MouseButton1Click:Connect(function()
-    currentAxeIndex = currentAxeIndex + 1
-    if currentAxeIndex > #axes then currentAxeIndex = 1 end
-    AxeCycleButton.Text = "Axe: " .. axes[currentAxeIndex].name .. " (" .. axes[currentAxeIndex].cd .. "s)"
-    AxeCycleButton.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
-    task.wait(0.2)
-    AxeCycleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-end)
-
---- 1. LEGIT AUTO CLICK ---
-AutoClickButton.MouseButton1Click:Connect(function()
-    clicking = not clicking
-    AutoClickButton.Text = clicking and "Auto Click: ON" or "Auto Click: OFF"
-    AutoClickButton.BackgroundColor3 = clicking and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(50, 50, 50)
-
-    task.spawn(function()
-        local clickRemote = ChaosService:WaitForChild("Clicked")
-        while clicking do
-            task.spawn(function() clickRemote:InvokeServer() end)
-            -- Waits the EXACT amount of time the server requires
-            task.wait(axes[currentAxeIndex].cd)
-        end
-    end)
-end)
-
---- 2. LEGIT AUTO TRAIN ---
-AutoTrainButton.MouseButton1Click:Connect(function()
-    training = not training
-    AutoTrainButton.Text = training and "Auto Train: ON" or "Auto Train: OFF"
-    AutoTrainButton.BackgroundColor3 = training and Color3.fromRGB(0, 150, 150) or Color3.fromRGB(50, 50, 50)
-
-    task.spawn(function()
-        while training do
-            task.spawn(function() ToolService:WaitForChild("onClick"):FireServer() end)
-            task.wait(axes[currentAxeIndex].cd)
-        end
-    end)
-end)
-
---- 3. LEGIT AUTO FARM ---
 local function glideTo(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -191,35 +31,73 @@ local function glideTo(targetPos)
     end
 end
 
-AutoFarmButton.MouseButton1Click:Connect(function()
-    farming = not farming
-    AutoFarmButton.Text = farming and "Auto Farm: ON" or "Auto Farm: OFF"
-    AutoFarmButton.BackgroundColor3 = farming and Color3.fromRGB(0, 180, 80) or Color3.fromRGB(50, 50, 50)
+FarmTab:CreateDropdown({
+   Name = "Select Tree Target",
+   Options = {"All Options", "PalmTree", "ChaosTree"},
+   CurrentOption = {"All Options"},
+   MultipleOptions = false,
+   Flag = "TreeSelect",
+   Callback = function(Option)
+       selectedTree = Option[1]
+   end,
+})
 
-    task.spawn(function()
-        while farming do
-            local children = AxeFolder:GetChildren()
-            local clickRemote = ChaosService:WaitForChild("Clicked")
-            
-            for i = 1, 15 do
-                if not farming then break end
-                local tree = children[i]
-                
-                if tree and tree.Parent then
-                    local hitPart = tree:IsA("BasePart") and tree or tree:FindFirstChildWhichIsA("BasePart")
-                    if hitPart then
-                        glideTo(hitPart.Position)
-                        local hitsRequired = getHitsNeeded()
-                        
-                        for hit = 1, hitsRequired do
-                            if not farming then break end
-                            task.spawn(function() clickRemote:InvokeServer() end)
-                            task.wait(axes[currentAxeIndex].cd) 
-                        end
-                    end
-                end
-            end
-            task.wait(0.5)
-        end
-    end)
-end)
+FarmTab:CreateDropdown({
+   Name = "Select Equipped Axe",
+   Options = {"Wooden (0.75s)", "Stone (0.70s)", "Iron (0.60s)", "Gold (0.50s)", "Diamond (0.35s)"},
+   CurrentOption = {"Wooden (0.75s)"},
+   MultipleOptions = false,
+   Flag = "AxeSelect",
+   Callback = function(Option)
+       local choice = Option[1]
+       if choice:match("Wooden") then selectedAxeCD = 0.75
+       elseif choice:match("Stone") then selectedAxeCD = 0.70
+       elseif choice:match("Iron") then selectedAxeCD = 0.60
+       elseif choice:match("Gold") then selectedAxeCD = 0.50
+       elseif choice:match("Diamond") then selectedAxeCD = 0.35
+       end
+   end,
+})
+
+FarmTab:CreateToggle({
+   Name = "Auto Break Tree",
+   CurrentValue = false,
+   Flag = "AutoFarm",
+   Callback = function(Value)
+       autoFarmActive = Value
+       
+       if autoFarmActive then
+           task.spawn(function()
+               local clickRemote = ChaosService:WaitForChild("Clicked")
+               
+               while autoFarmActive do
+                   for _, tree in ipairs(AxeFolder:GetChildren()) do
+                       if not autoFarmActive then break end
+                       
+                       local treeName = tree.Name
+                       local isMatch = false
+                       
+                       if selectedTree == "All Options" then
+                           isMatch = true
+                       elseif selectedTree == "PalmTree" and string.find(string.lower(treeName), "palm") then
+                           isMatch = true
+                       elseif selectedTree == "ChaosTree" and string.find(string.lower(treeName), "chaos") then
+                           isMatch = true
+                       end
+                       
+                       if isMatch and tree:FindFirstChildWhichIsA("BasePart") then
+                           local hitPart = tree:FindFirstChildWhichIsA("BasePart")
+                           glideTo(hitPart.Position)
+                           
+                           while tree and tree.Parent and tree:FindFirstChildWhichIsA("BasePart") and autoFarmActive do
+                               task.spawn(function() clickRemote:InvokeServer() end)
+                               task.wait(selectedAxeCD) 
+                           end
+                       end
+                   end
+                   task.wait(0.5) 
+               end
+           end)
+       end
+   end,
+})
