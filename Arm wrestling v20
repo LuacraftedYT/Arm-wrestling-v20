@@ -114,7 +114,7 @@ FarmTab:CreateToggle({
                        local targetHP = 50 
                        
                        if string.find(string.lower(treeName), "chaos") then
-                           targetHP = 250
+                           targetHP = 350
                            if selectedTree == "All Options" or selectedTree == "ChaosTree" then isMatch = true end
                        elseif string.find(string.lower(treeName), "palm") then
                            targetHP = 50
