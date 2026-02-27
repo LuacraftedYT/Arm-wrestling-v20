@@ -1,153 +1,106 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED HUB | Arm Wrestle Simulator",
-   LoadingTitle = "LUACRAFTED V31",
-   LoadingSubtitle = "Optimized & Lag-Free...",
-   ConfigurationSaving = { Enabled = false },
-   KeySystem = false 
+   Name = "LUACRAFTED V77 | PRECISE FARM",
+   LoadingTitle = "CALIBRATING HITBOXES...",
+   LoadingSubtitle = "3-Stud Precision Mode",
+   ConfigurationSaving = { Enabled = false }
 })
 
-local FarmTab = Window:CreateTab("Chaos Island", 4483362458) 
+local FarmTab = Window:CreateTab("🪓 Chaos Island", 4483362458) 
 
---- Services ---
+--- Services & Knit Setup ---
 local Player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
-local KnitServices = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services")
-local ChaosService = KnitServices:WaitForChild("ChaosBreakablesService"):WaitForChild("RF")
-local ToolService = KnitServices:WaitForChild("ToolService"):WaitForChild("RE")
-local AxeFolder = workspace:WaitForChild("GameObjects"):WaitForChild("ChaosBreakables"):WaitForChild("Axe")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Knit = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"))
 
---- Variables & Math Database ---
+-- Native Controller & Services
+local ChaosService = Knit.GetService("ChaosBreakablesService")
+
+--- Variables ---
 local selectedTree = "All Options"
 local autoFarmActive = false
-local autoTrainActive = false
 
-local axesData = {
-    ["Wooden (0.75s)"]  = {cd = 0.75, dmg = 2},
-    ["Stone (0.70s)"]   = {cd = 0.70, dmg = 4},
-    ["Iron (0.60s)"]    = {cd = 0.60, dmg = 6},
-    ["Gold (0.50s)"]    = {cd = 0.50, dmg = 10},
-    ["Diamond (0.35s)"] = {cd = 0.35, dmg = 18}
-}
-
-local currentAxe = axesData["Wooden (0.75s)"] 
-
---- Teleport Logic ---
-local function glideTo(targetPos)
+--- [[ THE 3-STUD PRECISION TWEEN ]] ---
+local function preciseGlide(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
         root.Anchored = false 
-        local targetCFrame = CFrame.new(targetPos.X, root.Position.Y, targetPos.Z) * CFrame.new(0, 0, 3.2)
-        local tween = TweenService:Create(root, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {CFrame = targetCFrame})
+        
+        -- 1. Calculate a position exactly 3 studs away from the tree
+        -- We add 4.5 to the Y-axis to prevent your feet from clipping into the floor
+        local direction = (root.Position - targetPos).Unit
+        local safePos = targetPos + (direction * 3) + Vector3.new(0, 4.5, 0)
+        
+        -- 2. Create a CFrame that faces the tree exactly (using the game's native logic)
+        local targetCFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
+        
+        -- 3. Smoothly move to the position
+        local tween = TweenService:Create(root, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {CFrame = targetCFrame})
         tween:Play()
         tween.Completed:Wait()
+        
+        -- 4. Lock in place for the hits
+        root.Anchored = true
     end
 end
 
---- Toggles & Dropdowns ---
+--- UI Components ---
 FarmTab:CreateDropdown({
    Name = "Select Tree Target",
    Options = {"All Options", "PalmTree", "ChaosTree"},
    CurrentOption = {"All Options"},
-   MultipleOptions = false,
-   Flag = "TreeSelect",
-   Callback = function(Option)
-       selectedTree = Option[1]
-   end,
-})
-
-FarmTab:CreateDropdown({
-   Name = "Select Equipped Axe",
-   Options = {"Wooden (0.75s)", "Stone (0.70s)", "Iron (0.60s)", "Gold (0.50s)", "Diamond (0.35s)"},
-   CurrentOption = {"Wooden (0.75s)"},
-   MultipleOptions = false,
-   Flag = "AxeSelect",
-   Callback = function(Option)
-       currentAxe = axesData[Option[1]]
-   end,
+   Callback = function(Option) selectedTree = Option[1] end,
 })
 
 FarmTab:CreateToggle({
-   Name = "Auto Train (Swing in Air)",
+   Name = "Native Auto-Break (3-Stud Mode)",
    CurrentValue = false,
-   Flag = "AutoTrain",
-   Callback = function(Value)
-       autoTrainActive = Value
-       if autoTrainActive then
-           task.spawn(function()
-               local trainRemote = ToolService:WaitForChild("onClick")
-               while autoTrainActive do
-                   task.spawn(function() trainRemote:FireServer() end)
-                   task.wait(currentAxe.cd) 
-               end
-           end)
-       end
-   end,
-})
-
-FarmTab:CreateToggle({
-   Name = "Auto Break Tree",
-   CurrentValue = false,
-   Flag = "AutoFarm",
    Callback = function(Value)
        autoFarmActive = Value
+       local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
        
-       local char = Player.Character
-       local root = char and char:FindFirstChild("HumanoidRootPart")
-       
-       if not autoFarmActive and root then
-           root.Anchored = false
-       end
+       if not Value and root then root.Anchored = false end
        
        if autoFarmActive then
            task.spawn(function()
-               local clickRemote = ChaosService:WaitForChild("Clicked")
-               
                while autoFarmActive do
-                   for _, tree in ipairs(AxeFolder:GetChildren()) do
+                   -- Locate the Breakables Folder
+                   local breakables = workspace.GameObjects.ChaosBreakables:GetDescendants()
+                   
+                   for _, tree in ipairs(breakables) do
                        if not autoFarmActive then break end
                        
-                       local treeName = tree.Name
-                       local isMatch = false
-                       local targetHP = 50 
-                       
-                       if string.find(string.lower(treeName), "chaos") then
-                           targetHP = 350
-                           if selectedTree == "All Options" or selectedTree == "ChaosTree" then isMatch = true end
-                       elseif string.find(string.lower(treeName), "palm") then
-                           targetHP = 50
-                           if selectedTree == "All Options" or selectedTree == "PalmTree" then isMatch = true end
-                       else
-                           if selectedTree == "All Options" then isMatch = true end
-                       end
-                       
-                       if isMatch then
-                           local hitPart = tree:IsA("BasePart") and tree or tree:FindFirstChildWhichIsA("BasePart")
+                       -- Verify tree is alive using the game's internal attribute
+                       if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true then
                            
-                           if hitPart and hitPart.Transparency < 1 then
-                               glideTo(hitPart.Position)
+                           local isMatch = false
+                           if selectedTree == "All Options" then isMatch = true 
+                           elseif string.find(tree.Name, selectedTree) then isMatch = true end
+                           
+                           local hitPart = tree:FindFirstChild("XZBounds") or tree.PrimaryPart
+                           
+                           if isMatch and hitPart then
+                               -- Move to the 3-stud offset
+                               preciseGlide(hitPart.Position)
                                
-                               root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                               if root then root.Anchored = true end
-                               
-                               local hitsRequired = math.ceil(targetHP / currentAxe.dmg) + 5
-                               
-                               for hit = 1, hitsRequired do
-                                   if not autoFarmActive then break end
-                                   task.spawn(function() clickRemote:InvokeServer() end)
-                                   task.wait(currentAxe.cd) 
+                               -- Spam the Clicked remote natively
+                               while autoFarmActive and tree:GetAttribute("Destroyed") ~= true do
+                                   pcall(function() 
+                                       ChaosService:Clicked() 
+                                   end)
+                                   task.wait(0.05) 
                                end
                                
                                if root then root.Anchored = false end
                            end
                        end
                    end
-                   task.wait(0.5) 
+                   task.wait(0.5)
                end
            end)
        end
    end,
 })
-
