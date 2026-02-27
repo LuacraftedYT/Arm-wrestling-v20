@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V82 | HARD RESET",
+   Name = "LUACRAFTED V83 | HARD RESET",
    LoadingTitle = "IMPLEMENTING DOUBLE SAFETY...",
-   LoadingSubtitle = "Auto-Toggle Failsafe Mode",
+   LoadingSubtitle = "3-Second Failsafe Mode",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -22,7 +22,7 @@ local ChaosService = Knit.GetService("ChaosBreakablesService")
 local selectedTree = "All Options"
 local autoFarmActive = false
 local lastDamageTime = os.clock()
-local FarmToggle = nil -- We create an empty variable so the script can find its own UI button later
+local FarmToggle = nil 
 
 -- ⚡ THE WATCHDOG: Hook into the server's damage signal
 local damageSignal = ChaosService.DamageBreakableSignal
@@ -67,9 +67,8 @@ FarmTab:CreateDropdown({
    end,
 })
 
--- We assign the toggle to the 'FarmToggle' variable we created earlier
 FarmToggle = FarmTab:CreateToggle({
-   Name = "Start Hard-Reset Auto-Break",
+   Name = "Start 3-Second Failsafe Auto-Break",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
@@ -106,22 +105,18 @@ FarmToggle = FarmTab:CreateToggle({
                                        ChaosService:Clicked() 
                                    end)
                                    
-                                   -- ⚡ THE HARD RESET FAILSAFE ⚡
-                                   if os.clock() - lastDamageTime > 10 then
-                                       print("⚠️ Failsafe Triggered: Toggling feature OFF and ON!")
+                                   -- ⚡ THE AGGRESSIVE 3-SECOND FAILSAFE ⚡
+                                   if os.clock() - lastDamageTime > 3 then
+                                       print("⚠️ Failsafe Triggered: No damage for 3 seconds. Toggling feature OFF and ON!")
                                        
-                                       -- Unanchor safely before restarting
                                        if root then root.Anchored = false end
                                        
                                        task.spawn(function()
-                                           -- Tell Rayfield to click the toggle OFF
                                            FarmToggle:Set(false)
-                                           task.wait(0.5) -- Give the game a half-second to breathe
-                                           -- Tell Rayfield to click the toggle ON
+                                           task.wait(0.25) -- Even faster reset breathing room
                                            FarmToggle:Set(true)
                                        end)
                                        
-                                       -- Kills this broken loop instantly so the new one can take over
                                        return 
                                    end
                                    
@@ -140,4 +135,4 @@ FarmToggle = FarmTab:CreateToggle({
    end,
 })
 
-FarmTab:CreateLabel("Automatically clicks its own UI to reset if stuck.")
+FarmTab:CreateLabel("Resets UI if stuck for 3 seconds.")
