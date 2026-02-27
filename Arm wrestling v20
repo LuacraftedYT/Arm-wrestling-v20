@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V86 | PLATFORM FARM",
-   LoadingTitle = "DEPLOYING INVISIBLE PLATFORM...",
-   LoadingSubtitle = "Network Sync + Blacklist System",
+   Name = "LUACRAFTED V87 | ANCHORED BLACKLIST",
+   LoadingTitle = "SECURING HITBOXES...",
+   LoadingSubtitle = "Anti-Fling + Blacklist System",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -31,25 +31,12 @@ if damageSignal then
     end)
 end
 
---- [[ 3. THE INVISIBLE PLATFORM FIX ]] ---
--- Spawn an invisible floor for the player to stand on so we don't need to use Anchor
-local platform = workspace:FindFirstChild("LuacraftedPlatform")
-if not platform then
-    platform = Instance.new("Part")
-    platform.Name = "LuacraftedPlatform"
-    platform.Size = Vector3.new(5, 1, 5)
-    platform.Anchored = true
-    platform.Transparency = 1
-    platform.CanCollide = true
-    platform.Parent = workspace
-end
-
+--- [[ 3. THE ANTI-FLING TELEPORT ]] ---
 local function preciseGlide(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
     if root then
-        -- Never anchor the player again!
         root.Anchored = false 
         
         local flatRoot = Vector3.new(root.Position.X, targetPos.Y, root.Position.Z)
@@ -62,14 +49,14 @@ local function preciseGlide(targetPos)
         -- Move 2 studs away, 3.5 studs high
         local safePos = targetPos + (direction * 2) + Vector3.new(0, 3.5, 0)
         
-        -- Teleport the invisible platform directly under the player's feet
-        platform.Position = safePos - Vector3.new(0, 3, 0)
-        
-        -- Teleport the player ONTO the platform
+        -- Teleport the player
         root.CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
         
-        -- Give the server a split second to register you landing on the platform
+        -- ⚡ THE FIX: Wait a split second unanchored to sync with the server...
         task.wait(0.1) 
+        
+        -- ⚡ ...then ANCHOR to prevent physics flinging!
+        root.Anchored = true
     end
 end
 
@@ -84,19 +71,18 @@ FarmTab:CreateDropdown({
 })
 
 FarmTab:CreateToggle({
-   Name = "Start Blacklist Auto-Break",
+   Name = "Start Anchored Auto-Break",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
        local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
        
-       if not Value then 
-           if root then root.Anchored = false end
-           platform.Position = Vector3.new(0, -10000, 0) -- Hide platform when off
+       if not Value and root then 
+           root.Anchored = false 
        end
        
        if autoFarmActive then
-           table.clear(buggedTrees) -- Clear the blacklist when you start fresh
+           table.clear(buggedTrees) -- Clear blacklist on start
            lastDamageTime = os.clock()
            
            task.spawn(function()
@@ -106,7 +92,7 @@ FarmTab:CreateToggle({
                    for _, tree in ipairs(breakables) do
                        if not autoFarmActive then break end
                        
-                       -- Verify tree is alive AND not in our Blacklist
+                       -- Verify tree is alive AND not blacklisted
                        if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true and not buggedTrees[tree] then
                            local isMatch = false
                            if selectedTree == "All Options" then isMatch = true 
@@ -125,13 +111,17 @@ FarmTab:CreateToggle({
                                    
                                    -- ⚡ THE BLACKLIST FAILSAFE ⚡
                                    if os.clock() - lastDamageTime > 3 then
-                                       print("⚠️ Failsafe: Tree is bugged or desynced. Adding to Blacklist!")
-                                       buggedTrees[tree] = true -- Throw it in the trash
-                                       break -- Skip to the next tree instantly
+                                       print("⚠️ Failsafe: Adding bugged tree to Blacklist and unanchoring!")
+                                       buggedTrees[tree] = true 
+                                       break -- Skip to next tree
                                    end
                                    
                                    task.wait(0.05) 
                                end
+                               
+                               -- Always unanchor before moving to the next tree
+                               root = Player.Character:FindFirstChild("HumanoidRootPart")
+                               if root then root.Anchored = false end
                            end
                        end
                    end
@@ -142,4 +132,4 @@ FarmTab:CreateToggle({
    end,
 })
 
-FarmTab:CreateLabel("Uses an invisible platform to guarantee server sync.")
+FarmTab:CreateLabel("Combines the Blacklist with the Anchor Anti-Fling.")
