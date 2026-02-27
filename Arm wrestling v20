@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V80 | INSTANT FARM",
-   LoadingTitle = "UPDATING PHYSICS...",
-   LoadingSubtitle = "Native Hitboxes + Physics Ping",
+   Name = "LUACRAFTED V81 | FAILSAFE FARM",
+   LoadingTitle = "IMPLEMENTING DOUBLE SAFETY...",
+   LoadingSubtitle = "Signal Monitor + Physics Ping",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -18,9 +18,19 @@ task.wait(1)
 local Knit = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"))
 local ChaosService = Knit.GetService("ChaosBreakablesService")
 
---- [[ 2. VARIABLES ]] ---
+--- [[ 2. VARIABLES & SIGNALS ]] ---
 local selectedTree = "All Options"
 local autoFarmActive = false
+local lastDamageTime = os.clock()
+
+-- ⚡ THE WATCHDOG: Hook into the exact server signal from your Dex dump
+local damageSignal = ChaosService.DamageBreakableSignal
+if damageSignal then
+    damageSignal:Connect(function()
+        -- Every time the server confirms a hit, reset the 10-second timer
+        lastDamageTime = os.clock() 
+    end)
+end
 
 --- [[ 3. THE PHYSICS-PING TELEPORT ]] ---
 local function preciseGlide(targetPos)
@@ -30,26 +40,21 @@ local function preciseGlide(targetPos)
     if root then
         root.Anchored = false 
         
-        -- Flatten the direction math
         local flatRoot = Vector3.new(root.Position.X, targetPos.Y, root.Position.Z)
         local direction = (flatRoot - targetPos).Unit
         
-        -- Fallback if direction is NaN
         if direction.Magnitude ~= direction.Magnitude then 
             direction = Vector3.new(1, 0, 0) 
         end
         
-        -- Calculate the exact safe hitting spot (3 studs away, 4.5 studs high)
         local safePos = targetPos + (direction * 3) + Vector3.new(0, 4.5, 0)
         
         -- INSTANT TELEPORT
         root.CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
         
-        -- ⚡ THE GENIUS FIX: Force a physics update to the server
+        -- Initial Physics Ping
         root.Anchored = false 
-        task.wait(0.05) -- Let the engine breathe for one frame so the server sees you
-        
-        -- Lock in place for the server-validated hits
+        task.wait(0.05) 
         root.Anchored = true
     end
 end
@@ -65,28 +70,23 @@ FarmTab:CreateDropdown({
 })
 
 FarmTab:CreateToggle({
-   Name = "Start Instant Auto-Break",
+   Name = "Start Failsafe Auto-Break",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
        local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
        
-       -- Unanchor if turned off
        if not Value and root then root.Anchored = false end
        
        if autoFarmActive then
            task.spawn(function()
                while autoFarmActive do
-                   -- Locate the Breakables Folder natively
                    local breakables = workspace.GameObjects.ChaosBreakables:GetDescendants()
                    
                    for _, tree in ipairs(breakables) do
                        if not autoFarmActive then break end
                        
-                       -- Verify tree is alive using the game's internal attribute
                        if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true then
-                           
-                           -- Match the tree type
                            local isMatch = false
                            if selectedTree == "All Options" then isMatch = true 
                            elseif string.find(tree.Name, selectedTree) then isMatch = true end
@@ -94,18 +94,31 @@ FarmTab:CreateToggle({
                            local hitPart = tree:FindFirstChild("XZBounds") or tree.PrimaryPart
                            
                            if isMatch and hitPart then
-                               -- Execute the instant teleport with the physics update
                                preciseGlide(hitPart.Position)
                                
-                               -- Spam the Native Clicked remote until Destroyed
+                               -- Reset timer when we arrive at a new tree to give it 10 seconds to start hitting
+                               lastDamageTime = os.clock() 
+                               
                                while autoFarmActive and tree:GetAttribute("Destroyed") ~= true do
                                    pcall(function() 
                                        ChaosService:Clicked() 
                                    end)
+                                   
+                                   -- ⚡ THE DOUBLE SAFETY FAILSAFE ⚡
+                                   if os.clock() - lastDamageTime > 10 then
+                                       print("⚠️ Failsafe Triggered: No damage registered for 10s. Re-syncing physics!")
+                                       if root then
+                                           root.Anchored = false
+                                           task.wait(0.05)
+                                           root.Anchored = true
+                                       end
+                                       -- Reset the timer so it doesn't spam the failsafe
+                                       lastDamageTime = os.clock() 
+                                   end
+                                   
                                    task.wait(0.05) 
                                end
                                
-                               -- Unanchor to prepare for the next jump
                                root = Player.Character:FindFirstChild("HumanoidRootPart")
                                if root then root.Anchored = false end
                            end
@@ -118,4 +131,4 @@ FarmTab:CreateToggle({
    end,
 })
 
-FarmTab:CreateLabel("Includes the split-second physics ping trick.")
+FarmTab:CreateLabel("Monitors DamageBreakableSignal for double safety.")
