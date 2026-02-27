@@ -1,73 +1,94 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V77 | PRECISE FARM",
-   LoadingTitle = "CALIBRATING HITBOXES...",
-   LoadingSubtitle = "3-Stud Precision Mode",
+   Name = "LUACRAFTED V78 | SKYHOPPER",
+   LoadingTitle = "BYPASSING TERRAIN...",
+   LoadingSubtitle = "Native Hitboxes + Hop Tweens",
    ConfigurationSaving = { Enabled = false }
 })
 
 local FarmTab = Window:CreateTab("🪓 Chaos Island", 4483362458) 
 
---- Services & Knit Setup ---
+--- [[ 1. SERVICES & KNIT SETUP ]] ---
 local Player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Knit = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"))
 
--- Native Controller & Services
+-- Wait for the game to load controllers
+task.wait(1)
+local Knit = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"))
 local ChaosService = Knit.GetService("ChaosBreakablesService")
 
---- Variables ---
+--- [[ 2. VARIABLES ]] ---
 local selectedTree = "All Options"
 local autoFarmActive = false
 
---- [[ THE 3-STUD PRECISION TWEEN ]] ---
+--- [[ 3. THE "HOP TWEEN" MOVEMENT LOGIC ]] ---
 local function preciseGlide(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
+    
     if root then
         root.Anchored = false 
         
-        -- 1. Calculate a position exactly 3 studs away from the tree
-        -- We add 4.5 to the Y-axis to prevent your feet from clipping into the floor
-        local direction = (root.Position - targetPos).Unit
+        -- Flatten the direction math so we don't calculate weird vertical angles
+        local flatRoot = Vector3.new(root.Position.X, targetPos.Y, root.Position.Z)
+        local direction = (flatRoot - targetPos).Unit
+        
+        -- Fallback if you are perfectly inside the tree's center
+        if direction.Magnitude ~= direction.Magnitude then 
+            direction = Vector3.new(1, 0, 0) 
+        end
+        
+        -- The Final Hitting Spot (3 studs away, 4.5 studs high to prevent floor clipping)
         local safePos = targetPos + (direction * 3) + Vector3.new(0, 4.5, 0)
         
-        -- 2. Create a CFrame that faces the tree exactly (using the game's native logic)
-        local targetCFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
+        -- The "Sky" Spot (15 studs higher to clear all rocks and hills)
+        local skyPos = Vector3.new(safePos.X, safePos.Y + 15, safePos.Z)
         
-        -- 3. Smoothly move to the position
-        local tween = TweenService:Create(root, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {CFrame = targetCFrame})
-        tween:Play()
-        tween.Completed:Wait()
+        -- TWEEN 1: Fly up and over the rocks
+        local tweenOver = TweenService:Create(root, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {
+            CFrame = CFrame.lookAt(skyPos, Vector3.new(targetPos.X, skyPos.Y, targetPos.Z))
+        })
+        tweenOver:Play()
+        tweenOver.Completed:Wait() 
         
-        -- 4. Lock in place for the hits
+        -- TWEEN 2: Drop straight down into the exact hitting position
+        local tweenDown = TweenService:Create(root, TweenInfo.new(0.15, Enum.EasingStyle.Sine), {
+            CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
+        })
+        tweenDown:Play()
+        tweenDown.Completed:Wait() 
+        
+        -- Lock in place for the server-validated hits
         root.Anchored = true
     end
 end
 
---- UI Components ---
+--- [[ 4. UI COMPONENTS ]] ---
 FarmTab:CreateDropdown({
    Name = "Select Tree Target",
    Options = {"All Options", "PalmTree", "ChaosTree"},
    CurrentOption = {"All Options"},
-   Callback = function(Option) selectedTree = Option[1] end,
+   Callback = function(Option) 
+       selectedTree = Option[1] 
+   end,
 })
 
 FarmTab:CreateToggle({
-   Name = "Native Auto-Break (3-Stud Mode)",
+   Name = "Start Skyhopper Auto-Break",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
        local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
        
+       -- Unanchor if turned off
        if not Value and root then root.Anchored = false end
        
        if autoFarmActive then
            task.spawn(function()
                while autoFarmActive do
-                   -- Locate the Breakables Folder
+                   -- Locate the Breakables Folder natively
                    local breakables = workspace.GameObjects.ChaosBreakables:GetDescendants()
                    
                    for _, tree in ipairs(breakables) do
@@ -76,6 +97,7 @@ FarmTab:CreateToggle({
                        -- Verify tree is alive using the game's internal attribute
                        if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true then
                            
+                           -- Match the tree type
                            local isMatch = false
                            if selectedTree == "All Options" then isMatch = true 
                            elseif string.find(tree.Name, selectedTree) then isMatch = true end
@@ -83,24 +105,29 @@ FarmTab:CreateToggle({
                            local hitPart = tree:FindFirstChild("XZBounds") or tree.PrimaryPart
                            
                            if isMatch and hitPart then
-                               -- Move to the 3-stud offset
+                               -- Execute the Hop Tween to get into position
                                preciseGlide(hitPart.Position)
                                
-                               -- Spam the Clicked remote natively
+                               -- Spam the Native Clicked remote until the game marks it as Destroyed
                                while autoFarmActive and tree:GetAttribute("Destroyed") ~= true do
                                    pcall(function() 
                                        ChaosService:Clicked() 
                                    end)
-                                   task.wait(0.05) 
+                                   task.wait(0.05) -- Lightning speed
                                end
                                
+                               -- Unanchor to prepare for the next hop
+                               root = Player.Character:FindFirstChild("HumanoidRootPart")
                                if root then root.Anchored = false end
                            end
                        end
                    end
+                   -- Brief pause before scanning for newly spawned trees
                    task.wait(0.5)
                end
            end)
        end
    end,
 })
+
+FarmTab:CreateLabel("100% Native Hook. Clears terrain obstacles automatically.")
