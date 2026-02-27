@@ -1,20 +1,19 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V78 | SKYHOPPER",
-   LoadingTitle = "BYPASSING TERRAIN...",
-   LoadingSubtitle = "Native Hitboxes + Hop Tweens",
-   ConfigurationSaving = { Enabled = false }
+   Name = "LUACRAFTED V80 | INSTANT FARM",
+   LoadingTitle = "UPDATING PHYSICS...",
+   LoadingSubtitle = "Native Hitboxes + Physics Ping",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false 
 })
 
 local FarmTab = Window:CreateTab("🪓 Chaos Island", 4483362458) 
 
 --- [[ 1. SERVICES & KNIT SETUP ]] ---
 local Player = game.Players.LocalPlayer
-local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Wait for the game to load controllers
 task.wait(1)
 local Knit = require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Knit"))
 local ChaosService = Knit.GetService("ChaosBreakablesService")
@@ -23,7 +22,7 @@ local ChaosService = Knit.GetService("ChaosBreakablesService")
 local selectedTree = "All Options"
 local autoFarmActive = false
 
---- [[ 3. THE "HOP TWEEN" MOVEMENT LOGIC ]] ---
+--- [[ 3. THE PHYSICS-PING TELEPORT ]] ---
 local function preciseGlide(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -31,34 +30,24 @@ local function preciseGlide(targetPos)
     if root then
         root.Anchored = false 
         
-        -- Flatten the direction math so we don't calculate weird vertical angles
+        -- Flatten the direction math
         local flatRoot = Vector3.new(root.Position.X, targetPos.Y, root.Position.Z)
         local direction = (flatRoot - targetPos).Unit
         
-        -- Fallback if you are perfectly inside the tree's center
+        -- Fallback if direction is NaN
         if direction.Magnitude ~= direction.Magnitude then 
             direction = Vector3.new(1, 0, 0) 
         end
         
-        -- The Final Hitting Spot (3 studs away, 4.5 studs high to prevent floor clipping)
+        -- Calculate the exact safe hitting spot (3 studs away, 4.5 studs high)
         local safePos = targetPos + (direction * 3) + Vector3.new(0, 4.5, 0)
         
-        -- The "Sky" Spot (15 studs higher to clear all rocks and hills)
-        local skyPos = Vector3.new(safePos.X, safePos.Y + 15, safePos.Z)
+        -- INSTANT TELEPORT
+        root.CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
         
-        -- TWEEN 1: Fly up and over the rocks
-        local tweenOver = TweenService:Create(root, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {
-            CFrame = CFrame.lookAt(skyPos, Vector3.new(targetPos.X, skyPos.Y, targetPos.Z))
-        })
-        tweenOver:Play()
-        tweenOver.Completed:Wait() 
-        
-        -- TWEEN 2: Drop straight down into the exact hitting position
-        local tweenDown = TweenService:Create(root, TweenInfo.new(0.15, Enum.EasingStyle.Sine), {
-            CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
-        })
-        tweenDown:Play()
-        tweenDown.Completed:Wait() 
+        -- ⚡ THE GENIUS FIX: Force a physics update to the server
+        root.Anchored = false 
+        task.wait(0.05) -- Let the engine breathe for one frame so the server sees you
         
         -- Lock in place for the server-validated hits
         root.Anchored = true
@@ -76,7 +65,7 @@ FarmTab:CreateDropdown({
 })
 
 FarmTab:CreateToggle({
-   Name = "Start Skyhopper Auto-Break",
+   Name = "Start Instant Auto-Break",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
@@ -105,24 +94,23 @@ FarmTab:CreateToggle({
                            local hitPart = tree:FindFirstChild("XZBounds") or tree.PrimaryPart
                            
                            if isMatch and hitPart then
-                               -- Execute the Hop Tween to get into position
+                               -- Execute the instant teleport with the physics update
                                preciseGlide(hitPart.Position)
                                
-                               -- Spam the Native Clicked remote until the game marks it as Destroyed
+                               -- Spam the Native Clicked remote until Destroyed
                                while autoFarmActive and tree:GetAttribute("Destroyed") ~= true do
                                    pcall(function() 
                                        ChaosService:Clicked() 
                                    end)
-                                   task.wait(0.05) -- Lightning speed
+                                   task.wait(0.05) 
                                end
                                
-                               -- Unanchor to prepare for the next hop
+                               -- Unanchor to prepare for the next jump
                                root = Player.Character:FindFirstChild("HumanoidRootPart")
                                if root then root.Anchored = false end
                            end
                        end
                    end
-                   -- Brief pause before scanning for newly spawned trees
                    task.wait(0.5)
                end
            end)
@@ -130,4 +118,4 @@ FarmTab:CreateToggle({
    end,
 })
 
-FarmTab:CreateLabel("100% Native Hook. Clears terrain obstacles automatically.")
+FarmTab:CreateLabel("Includes the split-second physics ping trick.")
