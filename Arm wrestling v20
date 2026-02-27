@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V85 | SMART SKIP",
-   LoadingTitle = "OPTIMIZING PATHFINDING...",
-   LoadingSubtitle = "Auto-Skip Bugged Trees",
+   Name = "LUACRAFTED V86 | PLATFORM FARM",
+   LoadingTitle = "DEPLOYING INVISIBLE PLATFORM...",
+   LoadingSubtitle = "Network Sync + Blacklist System",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -22,6 +22,7 @@ local ChaosService = Knit.GetService("ChaosBreakablesService")
 local selectedTree = "All Options"
 local autoFarmActive = false
 local lastDamageTime = os.clock()
+local buggedTrees = {} -- The Blacklist array
 
 local damageSignal = ChaosService.DamageBreakableSignal
 if damageSignal then
@@ -30,12 +31,25 @@ if damageSignal then
     end)
 end
 
---- [[ 3. THE LASER-FOCUS TELEPORT ]] ---
+--- [[ 3. THE INVISIBLE PLATFORM FIX ]] ---
+-- Spawn an invisible floor for the player to stand on so we don't need to use Anchor
+local platform = workspace:FindFirstChild("LuacraftedPlatform")
+if not platform then
+    platform = Instance.new("Part")
+    platform.Name = "LuacraftedPlatform"
+    platform.Size = Vector3.new(5, 1, 5)
+    platform.Anchored = true
+    platform.Transparency = 1
+    platform.CanCollide = true
+    platform.Parent = workspace
+end
+
 local function preciseGlide(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
     if root then
+        -- Never anchor the player again!
         root.Anchored = false 
         
         local flatRoot = Vector3.new(root.Position.X, targetPos.Y, root.Position.Z)
@@ -45,14 +59,17 @@ local function preciseGlide(targetPos)
             direction = Vector3.new(1, 0, 0) 
         end
         
-        -- 1.5 studs away, 2.5 studs high to hug the tree
-        local safePos = targetPos + (direction * 1.5) + Vector3.new(0, 2.5, 0)
+        -- Move 2 studs away, 3.5 studs high
+        local safePos = targetPos + (direction * 2) + Vector3.new(0, 3.5, 0)
         
+        -- Teleport the invisible platform directly under the player's feet
+        platform.Position = safePos - Vector3.new(0, 3, 0)
+        
+        -- Teleport the player ONTO the platform
         root.CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
         
-        root.Anchored = false 
-        task.wait(0.05) 
-        root.Anchored = true
+        -- Give the server a split second to register you landing on the platform
+        task.wait(0.1) 
     end
 end
 
@@ -67,17 +84,19 @@ FarmTab:CreateDropdown({
 })
 
 FarmTab:CreateToggle({
-   Name = "Start Smart-Skip Auto-Break",
+   Name = "Start Blacklist Auto-Break",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
        local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
        
-       if not Value and root then 
-           root.Anchored = false 
+       if not Value then 
+           if root then root.Anchored = false end
+           platform.Position = Vector3.new(0, -10000, 0) -- Hide platform when off
        end
        
        if autoFarmActive then
+           table.clear(buggedTrees) -- Clear the blacklist when you start fresh
            lastDamageTime = os.clock()
            
            task.spawn(function()
@@ -87,7 +106,8 @@ FarmTab:CreateToggle({
                    for _, tree in ipairs(breakables) do
                        if not autoFarmActive then break end
                        
-                       if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true then
+                       -- Verify tree is alive AND not in our Blacklist
+                       if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true and not buggedTrees[tree] then
                            local isMatch = false
                            if selectedTree == "All Options" then isMatch = true 
                            elseif string.find(tree.Name, selectedTree) then isMatch = true end
@@ -103,18 +123,15 @@ FarmTab:CreateToggle({
                                        ChaosService:Clicked() 
                                    end)
                                    
-                                   -- ⚡ THE SMART SKIP FAILSAFE ⚡
+                                   -- ⚡ THE BLACKLIST FAILSAFE ⚡
                                    if os.clock() - lastDamageTime > 3 then
-                                       print("⚠️ Failsafe: Tree bugged or hitting wrong target. Skipping to next tree!")
-                                       break -- This single word smashes out of the loop and moves to the next tree!
+                                       print("⚠️ Failsafe: Tree is bugged or desynced. Adding to Blacklist!")
+                                       buggedTrees[tree] = true -- Throw it in the trash
+                                       break -- Skip to the next tree instantly
                                    end
                                    
                                    task.wait(0.05) 
                                end
-                               
-                               -- Unanchor to prepare for the next jump
-                               root = Player.Character:FindFirstChild("HumanoidRootPart")
-                               if root then root.Anchored = false end
                            end
                        end
                    end
@@ -125,4 +142,4 @@ FarmTab:CreateToggle({
    end,
 })
 
-FarmTab:CreateLabel("If stuck for 3 seconds, ignores the tree and moves on.")
+FarmTab:CreateLabel("Uses an invisible platform to guarantee server sync.")
