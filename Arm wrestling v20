@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V83 | HARD RESET",
-   LoadingTitle = "IMPLEMENTING DOUBLE SAFETY...",
-   LoadingSubtitle = "3-Second Failsafe Mode",
+   Name = "LUACRAFTED V85 | SMART SKIP",
+   LoadingTitle = "OPTIMIZING PATHFINDING...",
+   LoadingSubtitle = "Auto-Skip Bugged Trees",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -22,9 +22,7 @@ local ChaosService = Knit.GetService("ChaosBreakablesService")
 local selectedTree = "All Options"
 local autoFarmActive = false
 local lastDamageTime = os.clock()
-local FarmToggle = nil 
 
--- ⚡ THE WATCHDOG: Hook into the server's damage signal
 local damageSignal = ChaosService.DamageBreakableSignal
 if damageSignal then
     damageSignal:Connect(function()
@@ -32,7 +30,7 @@ if damageSignal then
     end)
 end
 
---- [[ 3. THE PHYSICS-PING TELEPORT ]] ---
+--- [[ 3. THE LASER-FOCUS TELEPORT ]] ---
 local function preciseGlide(targetPos)
     local char = Player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -47,7 +45,8 @@ local function preciseGlide(targetPos)
             direction = Vector3.new(1, 0, 0) 
         end
         
-        local safePos = targetPos + (direction * 3) + Vector3.new(0, 4.5, 0)
+        -- 1.5 studs away, 2.5 studs high to hug the tree
+        local safePos = targetPos + (direction * 1.5) + Vector3.new(0, 2.5, 0)
         
         root.CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
         
@@ -67,8 +66,8 @@ FarmTab:CreateDropdown({
    end,
 })
 
-FarmToggle = FarmTab:CreateToggle({
-   Name = "Start 3-Second Failsafe Auto-Break",
+FarmTab:CreateToggle({
+   Name = "Start Smart-Skip Auto-Break",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
@@ -79,7 +78,6 @@ FarmToggle = FarmTab:CreateToggle({
        end
        
        if autoFarmActive then
-           -- Reset the timer the second you turn it on
            lastDamageTime = os.clock()
            
            task.spawn(function()
@@ -105,24 +103,16 @@ FarmToggle = FarmTab:CreateToggle({
                                        ChaosService:Clicked() 
                                    end)
                                    
-                                   -- ⚡ THE AGGRESSIVE 3-SECOND FAILSAFE ⚡
+                                   -- ⚡ THE SMART SKIP FAILSAFE ⚡
                                    if os.clock() - lastDamageTime > 3 then
-                                       print("⚠️ Failsafe Triggered: No damage for 3 seconds. Toggling feature OFF and ON!")
-                                       
-                                       if root then root.Anchored = false end
-                                       
-                                       task.spawn(function()
-                                           FarmToggle:Set(false)
-                                           task.wait(0.25) -- Even faster reset breathing room
-                                           FarmToggle:Set(true)
-                                       end)
-                                       
-                                       return 
+                                       print("⚠️ Failsafe: Tree bugged or hitting wrong target. Skipping to next tree!")
+                                       break -- This single word smashes out of the loop and moves to the next tree!
                                    end
                                    
                                    task.wait(0.05) 
                                end
                                
+                               -- Unanchor to prepare for the next jump
                                root = Player.Character:FindFirstChild("HumanoidRootPart")
                                if root then root.Anchored = false end
                            end
@@ -135,4 +125,4 @@ FarmToggle = FarmTab:CreateToggle({
    end,
 })
 
-FarmTab:CreateLabel("Resets UI if stuck for 3 seconds.")
+FarmTab:CreateLabel("If stuck for 3 seconds, ignores the tree and moves on.")
