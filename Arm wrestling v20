@@ -3,9 +3,9 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Window = Rayfield:CreateWindow({
-   Name = "LUACRAFTED V97 | THE HOLY TRINITY",
+   Name = "LUACRAFTED V98 | THE HOLY TRINITY",
    LoadingTitle = "SYNCHRONIZING ALL SYSTEMS...",
-   LoadingSubtitle = "Native Controller Hook Active",
+   LoadingSubtitle = "Hardcoded Coords + Native Egg",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -27,19 +27,20 @@ local ChaosService = Knit.GetService("ChaosBreakablesService")
 local ArmWrestleService = Knit.GetService("ArmWrestleService")
 local ArmWrestleController = Knit.GetController("ArmWrestleController")
 
--- Egg Controllers (NEW NATIVE HOOKS)
+-- Egg Controllers
 local EggController = Knit.GetController("EggController")
 local EggAnimController = Knit.GetController("EggAnimationController")
 
---- [[ MODULE 1: THE PERFECTED TREE FARM ]] ---
-local selectedTree = "All Options"
+--- [[ MODULE 1: THE HARDCODED TREE FARM ]] ---
 local autoFarmActive = false
 local lastDamageTime = os.clock()
-local buggedTrees = {}
 
--- 🚫 THE HARDCODED BLACKLIST 🚫
-local badTreeCoords = {
-    Vector3.new(-8829, 3, 8191), 
+-- 📍 YOUR EXACT TREE COORDINATES 📍
+local myTreeLocations = {
+    Vector3.new(-8780, 4, 8216),
+    Vector3.new(-8814, 3, 8252),
+    Vector3.new(-8785, 4, 8223),
+    Vector3.new(-8782, 3, 8250)
 }
 
 task.spawn(function()
@@ -61,36 +62,8 @@ if not platform then
     platform.Parent = workspace
 end
 
-local function preciseGlide(targetPos)
-    local char = Player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    
-    if root then
-        root.Anchored = false 
-        local flatRoot = Vector3.new(root.Position.X, targetPos.Y, root.Position.Z)
-        local direction = (flatRoot - targetPos).Unit
-        
-        if direction.Magnitude ~= direction.Magnitude then direction = Vector3.new(1, 0, 0) end
-        
-        local safePos = targetPos + (direction * 2) + Vector3.new(0, 3.5, 0)
-        
-        platform.Position = safePos - Vector3.new(0, 3, 0)
-        root.CFrame = CFrame.lookAt(safePos, Vector3.new(targetPos.X, safePos.Y, targetPos.Z))
-        
-        task.wait(0.1) 
-        root.Anchored = true
-    end
-end
-
-FarmTab:CreateDropdown({
-   Name = "Select Tree Target",
-   Options = {"All Options", "PalmTree", "ChaosTree"},
-   CurrentOption = {"All Options"},
-   Callback = function(Option) selectedTree = Option[1] end,
-})
-
 FarmTab:CreateToggle({
-   Name = "Start Anchored Auto-Break",
+   Name = "Start Hardcoded Coordinate Farm",
    CurrentValue = false,
    Callback = function(Value)
        autoFarmActive = Value
@@ -102,49 +75,54 @@ FarmTab:CreateToggle({
        end
        
        if autoFarmActive then
-           table.clear(buggedTrees) 
-           lastDamageTime = os.clock()
-           
            task.spawn(function()
                while autoFarmActive do
-                   local breakables = workspace.GameObjects.ChaosBreakables:GetDescendants()
-                   for _, tree in ipairs(breakables) do
+                   
+                   -- Loop through your custom list of coordinates
+                   for _, targetCoord in ipairs(myTreeLocations) do
                        if not autoFarmActive then break end
                        
-                       if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true and not buggedTrees[tree] then
-                           local isMatch = false
-                           if selectedTree == "All Options" then isMatch = true 
-                           elseif string.find(tree.Name, selectedTree) then isMatch = true end
-                           
-                           local hitPart = tree:FindFirstChild("XZBounds") or tree.PrimaryPart
-                           
-                           if isMatch and hitPart then
+                       -- Find the tree at this coordinate
+                       local currentTree = nil
+                       for _, tree in ipairs(workspace.GameObjects.ChaosBreakables:GetDescendants()) do
+                           if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true then
+                               if (tree:GetPivot().Position - targetCoord).Magnitude < 15 then
+                                   currentTree = tree
+                                   break
+                               end
+                           end
+                       end
+                       
+                       -- If the tree is alive, execute the attack sequence
+                       if currentTree then
+                           root = Player.Character:FindFirstChild("HumanoidRootPart")
+                           if root then
+                               -- Teleport 2 studs away from your exact coordinate
+                               local safePos = targetCoord + Vector3.new(2, 3.5, 2)
+                               platform.Position = safePos - Vector3.new(0, 3, 0)
+                               root.CFrame = CFrame.lookAt(safePos, targetCoord)
                                
-                               local skipThisTree = false
-                               for _, badPos in ipairs(badTreeCoords) do
-                                   if (hitPart.Position - badPos).Magnitude < 6 then
-                                       skipThisTree = true
-                                       break
+                               -- ⚡ YOUR CUSTOM PHYSICS PING ⚡
+                               root.Anchored = true
+                               task.wait(0.05)
+                               root.Anchored = false
+                               task.wait(0.05)
+                               root.Anchored = true
+                               
+                               lastDamageTime = os.clock() 
+                               
+                               while autoFarmActive and currentTree:GetAttribute("Destroyed") ~= true do
+                                   pcall(function() ChaosService:Clicked() end)
+                                   
+                                   -- Failsafe: Move to next coordinate if stuck for 3s
+                                   if os.clock() - lastDamageTime > 3 then 
+                                       break 
                                    end
+                                   task.wait(0.05) 
                                end
                                
-                               if not skipThisTree then
-                                   preciseGlide(hitPart.Position)
-                                   lastDamageTime = os.clock() 
-                                   
-                                   while autoFarmActive and tree:GetAttribute("Destroyed") ~= true do
-                                       pcall(function() ChaosService:Clicked() end)
-                                       
-                                       if os.clock() - lastDamageTime > 3 then
-                                           buggedTrees[tree] = true 
-                                           break 
-                                       end
-                                       task.wait(0.05) 
-                                   end
-                                   
-                                   root = Player.Character:FindFirstChild("HumanoidRootPart")
-                                   if root then root.Anchored = false end
-                               end
+                               -- Unanchor before moving to the next target
+                               if root then root.Anchored = false end
                            end
                        end
                    end
@@ -154,6 +132,8 @@ FarmTab:CreateToggle({
        end
    end,
 })
+
+FarmTab:CreateLabel("Only attacks your specified coordinates.")
 
 --- [[ MODULE 2: BOSS GOD-MODE ]] ---
 BossTab:CreateToggle({
@@ -193,20 +173,19 @@ BossTab:CreateToggle({
 })
 
 --- [[ MODULE 3: NATIVE AUTO-EGG ]] ---
--- 1. Extract Exact Strings
 local eggDict = {
     ["Earth Egg"] = "Unknown",
     ["Alien Egg"] = "Unknown"
 }
 
--- Target 1: Earth Egg (Zone 1)
+-- Target 1: Earth Egg
 local earthTarget = workspace.Zones["1"].Interactables.Eggs:FindFirstChild("Earth Egg")
 if earthTarget then
     local prompt = earthTarget:FindFirstChildWhichIsA("ProximityPrompt", true)
     if prompt then eggDict["Earth Egg"] = prompt:GetAttribute("Egg") end
 end
 
--- Target 2: Alien Egg (Zone 23)
+-- Target 2: Alien Egg
 local alienTarget = nil
 pcall(function()
     alienTarget = workspace.Zones["23"].Interactables.Eggs.CrushcoreEgg.Egg.AlienEgg
@@ -219,7 +198,6 @@ end
 
 local exactEggString = eggDict["Earth Egg"]
 
--- 2. Hijack Controllers (Silence UI & Animations)
 if EggAnimController and EggController then
     EggAnimController.Hatch = function() end
     EggController.opening = function(self)
@@ -246,17 +224,14 @@ EggTab:CreateToggle({
        task.spawn(function()
            while _G.NativeHatch do
                if exactEggString == "Unknown" then
-                   warn("❌ [ERROR] Cannot start. Egg ID is Unknown. Are you in the right zone?")
                    task.wait(1)
                    continue
                end
                
-               -- Force controller state
                EggController.CurrentEgg = exactEggString
                EggController.CanOpen = true
                EggController.EggIsOpening = false
                
-               -- Automatically read gamepasses!
                local triple = Player:GetAttribute("TripleEggs") or false
                local octo = Player:GetAttribute("OctoEggs") or false
                
@@ -269,5 +244,3 @@ EggTab:CreateToggle({
        end)
    end,
 })
-
-EggTab:CreateLabel("Bypasses animations and auto-detects 3x/8x gamepasses.")
