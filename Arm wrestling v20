@@ -5,7 +5,7 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 local Window = Rayfield:CreateWindow({
    Name = "LUACRAFTED | APEX CORE",
    LoadingTitle = "BOOTING COMBAT SYSTEMS...",
-   LoadingSubtitle = "0.05s Axe Cooldown Restored",
+   LoadingSubtitle = "Drive-By Fix Applied",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -41,7 +41,7 @@ local EggTab = Window:CreateTab("🥚 Auto-Egg", 4483362458)
 local MerchantTab = Window:CreateTab("🛒 Merchant", 4483362458)
 local UtilityTab = Window:CreateTab("🪦 Utility", 4483362458)
 
---- [[ 1. AUTO-FARM (0.05 COOLDOWN) ]] ---
+--- [[ 1. AUTO-FARM (FIXED LOCK-ON) ]] ---
 local treeDatabase = {
     ["Palm Trees"] = {Vector3.new(-8595, 3, 8089), Vector3.new(-8610, 3, 8038), Vector3.new(-8620, 3, 8068), Vector3.new(-8643, 3, 8036), Vector3.new(-8661, 3, 8016)},
     ["Chaos Trees"] = {Vector3.new(-8780, 4, 8216), Vector3.new(-8814, 3, 8252)},
@@ -66,22 +66,45 @@ FarmTab:CreateToggle({
        if Value and ChaosService then
            task.spawn(function()
                while _G.FarmActive do
-                   for _, coord in ipairs(activeRoute) do
+                   for _, targetCoord in ipairs(activeRoute) do
                        if not _G.FarmActive then break end
-                       local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-                       if root then
-                           -- Instantly teleport to the tree and anchor
-                           root.CFrame = CFrame.new(coord + Vector3.new(0, 3.5, 0))
-                           root.Anchored = true
-                           
-                           -- Old blazing-fast 0.05s swing speed
-                           task.wait(0.05) 
-                           pcall(function() ChaosService:Clicked() end)
-                           task.wait(0.05) 
-                           
-                           root.Anchored = false
+                       
+                       -- 1. Find the physical tree model near the coordinate
+                       local currentTree = nil
+                       for _, tree in ipairs(workspace.GameObjects.ChaosBreakables:GetDescendants()) do
+                           if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true then
+                               if (tree:GetPivot().Position - targetCoord).Magnitude < 15 then 
+                                   currentTree = tree 
+                                   break 
+                               end
+                           end
+                       end
+                       
+                       -- 2. Lock onto it and spam until it's dead
+                       if currentTree then
+                           local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                           if root then
+                               -- Teleport slightly offset so you hit it
+                               root.CFrame = CFrame.new(targetCoord + Vector3.new(2, 3.5, 2), Vector3.new(targetCoord.X, targetCoord.Y + 3.5, targetCoord.Z))
+                               root.Anchored = true
+                               
+                               local attackStartTime = os.clock()
+                               
+                               -- The "Stay and Fight" Loop
+                               while _G.FarmActive and currentTree and currentTree.Parent and currentTree:GetAttribute("Destroyed") ~= true do
+                                   pcall(function() ChaosService:Clicked() end)
+                                   
+                                   -- Failsafe: if a tree glitches and won't break after 45 seconds, move on
+                                   if os.clock() - attackStartTime > 45 then break end
+                                   
+                                   task.wait(0.05) -- Blazing fast 0.05 cooldown
+                               end
+                               
+                               root.Anchored = false
+                           end
                        end
                    end
+                   task.wait(0.2) -- Tiny pause before restarting the route
                end
            end)
        end
