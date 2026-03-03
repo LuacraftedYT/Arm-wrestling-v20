@@ -5,7 +5,7 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 local Window = Rayfield:CreateWindow({
    Name = "LUACRAFTED | APEX CORE",
    LoadingTitle = "BOOTING COMBAT SYSTEMS...",
-   LoadingSubtitle = "Drive-By Fix Applied",
+   LoadingSubtitle = "Anchor Physics Trick Applied",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false 
 })
@@ -41,7 +41,7 @@ local EggTab = Window:CreateTab("🥚 Auto-Egg", 4483362458)
 local MerchantTab = Window:CreateTab("🛒 Merchant", 4483362458)
 local UtilityTab = Window:CreateTab("🪦 Utility", 4483362458)
 
---- [[ 1. AUTO-FARM (FIXED LOCK-ON) ]] ---
+--- [[ 1. AUTO-FARM (PHYSICS TRICK ENABLED) ]] ---
 local treeDatabase = {
     ["Palm Trees"] = {Vector3.new(-8595, 3, 8089), Vector3.new(-8610, 3, 8038), Vector3.new(-8620, 3, 8068), Vector3.new(-8643, 3, 8036), Vector3.new(-8661, 3, 8016)},
     ["Chaos Trees"] = {Vector3.new(-8780, 4, 8216), Vector3.new(-8814, 3, 8252)},
@@ -63,13 +63,19 @@ FarmTab:CreateToggle({
    CurrentValue = false,
    Callback = function(Value)
        _G.FarmActive = Value
+       
+       -- Make sure we unanchor if you toggle it off mid-farm
+       if not Value then
+           local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+           if root then root.Anchored = false end
+       end
+       
        if Value and ChaosService then
            task.spawn(function()
                while _G.FarmActive do
                    for _, targetCoord in ipairs(activeRoute) do
                        if not _G.FarmActive then break end
                        
-                       -- 1. Find the physical tree model near the coordinate
                        local currentTree = nil
                        for _, tree in ipairs(workspace.GameObjects.ChaosBreakables:GetDescendants()) do
                            if tree:IsA("Model") and tree:GetAttribute("Destroyed") ~= true then
@@ -80,12 +86,17 @@ FarmTab:CreateToggle({
                            end
                        end
                        
-                       -- 2. Lock onto it and spam until it's dead
                        if currentTree then
                            local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
                            if root then
-                               -- Teleport slightly offset so you hit it
+                               -- Teleport
                                root.CFrame = CFrame.new(targetCoord + Vector3.new(2, 3.5, 2), Vector3.new(targetCoord.X, targetCoord.Y + 3.5, targetCoord.Z))
+                               
+                               -- ✨ THE PHYSICS TRICK ✨
+                               root.Anchored = true
+                               task.wait(0.05)
+                               root.Anchored = false
+                               task.wait(0.05)
                                root.Anchored = true
                                
                                local attackStartTime = os.clock()
@@ -93,10 +104,7 @@ FarmTab:CreateToggle({
                                -- The "Stay and Fight" Loop
                                while _G.FarmActive and currentTree and currentTree.Parent and currentTree:GetAttribute("Destroyed") ~= true do
                                    pcall(function() ChaosService:Clicked() end)
-                                   
-                                   -- Failsafe: if a tree glitches and won't break after 45 seconds, move on
                                    if os.clock() - attackStartTime > 45 then break end
-                                   
                                    task.wait(0.05) -- Blazing fast 0.05 cooldown
                                end
                                
@@ -104,7 +112,7 @@ FarmTab:CreateToggle({
                            end
                        end
                    end
-                   task.wait(0.2) -- Tiny pause before restarting the route
+                   task.wait(0.2) 
                end
            end)
        end
